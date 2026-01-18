@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Box Breathing</title>
-    <meta name="description" content="A box breathing exercise app for relaxation and focus">
+    <title>Breathing Exercises</title>
+    <meta name="description" content="Breathing exercises for relaxation, focus, and wellbeing">
     <meta name="theme-color" content="#000000">
     <link rel="apple-touch-icon" href="icons/icon-192x192.PNG">
     <link rel="manifest" href="manifest.json">
@@ -282,6 +282,44 @@
             fill: none;
             stroke-linecap: round;
             stroke-linejoin: round;
+        }
+
+        .exercise-selector {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            justify-content: center;
+            margin-bottom: 1rem;
+            max-width: 400px;
+        }
+
+        .exercise-button {
+            font-size: 0.9rem;
+            padding: 0.5rem 0.75rem;
+            background: #374151;
+            color: #fde68a;
+            border: 2px solid #4b5563;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .exercise-button:hover {
+            background: #4b5563;
+            border-color: #6b7280;
+        }
+
+        .exercise-button.active {
+            background: linear-gradient(to bottom, #d97706, #b45309);
+            color: black;
+            border-color: #f59e0b;
+        }
+
+        .exercise-description {
+            color: #9ca3af;
+            font-size: 0.95rem;
+            margin: 0 0 1.5rem 0;
+            text-align: center;
         }
 
         .shortcut-buttons {

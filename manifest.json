@@ -1,7 +1,7 @@
 {
-  "name": "Box Breathing",
-  "short_name": "Box Breath",
-  "description": "A box breathing exercise app for relaxation and focus",
+  "name": "Breathing Exercises",
+  "short_name": "Breathe",
+  "description": "Breathing exercises for relaxation, focus, and wellbeing",
   "start_url": "./index.html",
   "id": "./index.html",
   "display": "standalone",
