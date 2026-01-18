@@ -42,7 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 { name: 'Exhale', duration: exhaleDuration, color: '#38bdf8' }
             ],
             hasPhaseTimeSlider: true,
-            phaseTimeRange: { min: 4, max: 6, step: 1, default: 6 },
+            phaseTimeRange: { min: 6, max: 8, step: 1, default: 6 },
             phaseTimeLabel: 'Exhale Time',
             phaseTimeUnit: 'seconds'
         },
@@ -79,6 +79,49 @@ document.addEventListener('DOMContentLoaded', () => {
         hasStarted: false,
         startTime: null
     };
+
+    // Settings persistence
+    const STORAGE_KEY = 'breathingExercisesSettings';
+
+    function saveSettings() {
+        try {
+            const settings = {
+                soundEnabled: state.soundEnabled,
+                exerciseType: state.exerciseType,
+                phaseTime: state.phaseTime,
+                exhaleDuration: state.exhaleDuration
+            };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+        } catch (e) {
+            console.error('Failed to save settings:', e);
+        }
+    }
+
+    function loadSettings() {
+        try {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                const settings = JSON.parse(saved);
+                if (typeof settings.soundEnabled === 'boolean') {
+                    state.soundEnabled = settings.soundEnabled;
+                }
+                if (settings.exerciseType && exerciseTypes[settings.exerciseType]) {
+                    state.exerciseType = settings.exerciseType;
+                }
+                if (typeof settings.phaseTime === 'number') {
+                    state.phaseTime = settings.phaseTime;
+                }
+                if (typeof settings.exhaleDuration === 'number') {
+                    state.exhaleDuration = settings.exhaleDuration;
+                }
+            }
+        } catch (e) {
+            console.error('Failed to load settings:', e);
+        }
+    }
+
+    // Load settings on startup
+    loadSettings();
 
     function getCurrentPhases() {
         const exercise = exerciseTypes[state.exerciseType];
@@ -332,6 +375,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function toggleSound() {
         state.soundEnabled = !state.soundEnabled;
+        saveSettings();
         render();
     }
 
@@ -348,6 +392,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (type === 'longExhale') {
             state.exhaleDuration = exercise.phaseTimeRange.default;
         }
+        saveSettings();
         render();
     }
 
@@ -702,6 +747,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         state.phaseTime = value;
                     }
                     document.getElementById('phase-time-value').textContent = value;
+                    saveSettings();
                 });
             }
 
