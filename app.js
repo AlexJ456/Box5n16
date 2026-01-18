@@ -9,6 +9,56 @@ document.addEventListener('DOMContentLoaded', () => {
     const initialWidth = layoutHost ? layoutHost.clientWidth : canvas.clientWidth;
     const initialHeight = layoutHost ? layoutHost.clientHeight : canvas.clientHeight;
 
+    // Exercise type definitions
+    const exerciseTypes = {
+        box: {
+            name: 'Box Breathing',
+            description: 'Equal phases for balance and calm',
+            getPhases: (phaseTime) => [
+                { name: 'Inhale', duration: phaseTime, color: '#f97316' },
+                { name: 'Hold', duration: phaseTime, color: '#fbbf24' },
+                { name: 'Exhale', duration: phaseTime, color: '#38bdf8' },
+                { name: 'Wait', duration: phaseTime, color: '#22c55e' }
+            ],
+            hasPhaseTimeSlider: true,
+            phaseTimeRange: { min: 3, max: 6, step: 1, default: 4 },
+            phaseTimeLabel: 'Phase Time'
+        },
+        fourSevenEight: {
+            name: '4-7-8 Breathing',
+            description: 'Relaxation and sleep aid',
+            getPhases: () => [
+                { name: 'Inhale', duration: 4, color: '#f97316' },
+                { name: 'Hold', duration: 7, color: '#fbbf24' },
+                { name: 'Exhale', duration: 8, color: '#38bdf8' }
+            ],
+            hasPhaseTimeSlider: false
+        },
+        longExhale: {
+            name: 'Long Exhale',
+            description: 'Extended exhale for relaxation',
+            getPhases: (_, exhaleDuration) => [
+                { name: 'Inhale', duration: 4, color: '#f97316' },
+                { name: 'Exhale', duration: exhaleDuration, color: '#38bdf8' }
+            ],
+            hasPhaseTimeSlider: true,
+            phaseTimeRange: { min: 4, max: 6, step: 1, default: 6 },
+            phaseTimeLabel: 'Exhale Time',
+            phaseTimeUnit: 'seconds'
+        },
+        coherent: {
+            name: 'Coherent Breathing',
+            description: 'Equal inhale and exhale for HRV',
+            getPhases: (phaseTime) => [
+                { name: 'Inhale', duration: phaseTime, color: '#f97316' },
+                { name: 'Exhale', duration: phaseTime, color: '#38bdf8' }
+            ],
+            hasPhaseTimeSlider: true,
+            phaseTimeRange: { min: 4.5, max: 6, step: 0.5, default: 5 },
+            phaseTimeLabel: 'Breath Time'
+        }
+    };
+
     const state = {
         isPlaying: false,
         count: 0,
@@ -19,6 +69,8 @@ document.addEventListener('DOMContentLoaded', () => {
         sessionComplete: false,
         timeLimitReached: false,
         phaseTime: 4,
+        exhaleDuration: 6,
+        exerciseType: 'box',
         pulseStartTime: null,
         devicePixelRatio: Math.min(window.devicePixelRatio || 1, 1.75),
         viewportWidth: initialWidth,
@@ -27,6 +79,18 @@ document.addEventListener('DOMContentLoaded', () => {
         hasStarted: false,
         startTime: null
     };
+
+    function getCurrentPhases() {
+        const exercise = exerciseTypes[state.exerciseType];
+        if (state.exerciseType === 'longExhale') {
+            return exercise.getPhases(state.phaseTime, state.exhaleDuration);
+        }
+        return exercise.getPhases(state.phaseTime);
+    }
+
+    function getTotalCycleTime() {
+        return getCurrentPhases().reduce((sum, phase) => sum + phase.duration, 0);
+    }
 
     let wakeLock = null;
     let audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -69,13 +133,19 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     function getInstruction(count) {
-        switch (count) {
-            case 0: return 'Inhale';
-            case 1: return 'Hold';
-            case 2: return 'Exhale';
-            case 3: return 'Wait';
-            default: return '';
+        const phases = getCurrentPhases();
+        if (count >= 0 && count < phases.length) {
+            return phases[count].name;
         }
+        return '';
+    }
+
+    function getPhaseColor(count) {
+        const phases = getCurrentPhases();
+        if (count >= 0 && count < phases.length) {
+            return phases[count].color;
+        }
+        return '#f97316';
     }
 
     const phaseColors = ['#f97316', '#fbbf24', '#38bdf8', '#22c55e'];
@@ -213,7 +283,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             state.hasStarted = true;
             state.totalTime = 0;
-            state.countdown = state.phaseTime;
+            const phases = getCurrentPhases();
+            state.countdown = Math.ceil(phases[0].duration);
             state.count = 0;
             state.sessionComplete = false;
             state.timeLimitReached = false;
@@ -225,7 +296,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             cancelAnimationFrame(animationFrameId);
             state.totalTime = 0;
-            state.countdown = state.phaseTime;
+            const phases = getCurrentPhases();
+            state.countdown = Math.ceil(phases[0].duration);
             state.count = 0;
             state.sessionComplete = false;
             state.timeLimitReached = false;
@@ -242,7 +314,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function resetToStart() {
         state.isPlaying = false;
         state.totalTime = 0;
-        state.countdown = state.phaseTime;
+        const phases = getCurrentPhases();
+        state.countdown = Math.ceil(phases[0].duration);
         state.count = 0;
         state.sessionComplete = false;
         state.timeLimit = '';
@@ -266,11 +339,24 @@ document.addEventListener('DOMContentLoaded', () => {
         state.timeLimit = e.target.value.replace(/[^0-9]/g, '');
     }
 
+    function setExerciseType(type) {
+        state.exerciseType = type;
+        const exercise = exerciseTypes[type];
+        if (exercise.hasPhaseTimeSlider) {
+            state.phaseTime = exercise.phaseTimeRange.default;
+        }
+        if (type === 'longExhale') {
+            state.exhaleDuration = exercise.phaseTimeRange.default;
+        }
+        render();
+    }
+
     function startWithPreset(minutes) {
         state.timeLimit = minutes.toString();
         state.isPlaying = true;
         state.totalTime = 0;
-        state.countdown = state.phaseTime;
+        const phases = getCurrentPhases();
+        state.countdown = Math.ceil(phases[0].duration);
         state.count = 0;
         state.sessionComplete = false;
         state.timeLimitReached = false;
@@ -321,12 +407,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const now = timestamp;
         const allowMotion = !state.prefersReducedMotion;
+
+        // Get current phase info
+        const phases = getCurrentPhases();
+        const currentPhaseName = phases[phase]?.name || 'Inhale';
+
         let breathInfluence = 0;
-        if (phase === 0) {
+        if (currentPhaseName === 'Inhale') {
             breathInfluence = easedProgress;
-        } else if (phase === 2) {
+        } else if (currentPhaseName === 'Exhale') {
             breathInfluence = 1 - easedProgress;
         } else if (allowMotion) {
+            // Hold or Wait phases
             breathInfluence = 0.3 + 0.2 * (0.5 + 0.5 * Math.sin(now / 350));
         } else {
             breathInfluence = 0.3;
@@ -343,14 +435,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const size = sizeWithoutBreath * (1 + 0.08 * breathInfluence + 0.03 * pulseBoost);
         const adjustedLeft = left + (sizeWithoutBreath - size) / 2;
         const adjustedTop = top + (sizeWithoutBreath - size) / 2;
-        const points = [
-            { x: adjustedLeft, y: adjustedTop + size },
-            { x: adjustedLeft, y: adjustedTop },
-            { x: adjustedLeft + size, y: adjustedTop },
-            { x: adjustedLeft + size, y: adjustedTop + size }
-        ];
 
-        let accentColor = phaseColors[phase] || '#f97316';
+        let accentColor = getPhaseColor(phase);
         if (state.sessionComplete) {
             accentColor = '#4ade80';
         }
@@ -384,20 +470,33 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!state.isPlaying) return;
 
         const now = performance.now();
+        const phases = getCurrentPhases();
+        const totalCycleTime = getTotalCycleTime();
 
         // Calculate absolute timing
         const totalElapsed = (now - state.startTime) / 1000;
         const newTotalTime = Math.floor(totalElapsed);
 
-        const phaseElapsed = totalElapsed % state.phaseTime;
-        const secondsIntoPhase = Math.floor(phaseElapsed);
-        const newCountdown = state.phaseTime - secondsIntoPhase;
+        // Find current phase based on cycle position
+        const cycleElapsed = totalElapsed % totalCycleTime;
 
-        const cycleElapsed = totalElapsed % (state.phaseTime * 4);
-        const newCount = Math.floor(cycleElapsed / state.phaseTime);
+        let accumulatedTime = 0;
+        let newCount = 0;
+        let phaseStartTime = 0;
 
-        const fractionalProgress = phaseElapsed - secondsIntoPhase;
-        const progress = (secondsIntoPhase + fractionalProgress) / state.phaseTime;
+        for (let i = 0; i < phases.length; i++) {
+            if (cycleElapsed >= accumulatedTime && cycleElapsed < accumulatedTime + phases[i].duration) {
+                newCount = i;
+                phaseStartTime = accumulatedTime;
+                break;
+            }
+            accumulatedTime += phases[i].duration;
+        }
+
+        const currentPhaseDuration = phases[newCount].duration;
+        const phaseElapsed = cycleElapsed - phaseStartTime;
+        const progress = phaseElapsed / currentPhaseDuration;
+        const newCountdown = Math.ceil(currentPhaseDuration - phaseElapsed);
 
         let needsRender = false;
 
@@ -419,7 +518,9 @@ document.addEventListener('DOMContentLoaded', () => {
             playTone();
             needsRender = true;
 
-            if (state.count === 3 && state.timeLimitReached) {
+            // End session when reaching the last phase after time limit
+            const lastPhaseIndex = phases.length - 1;
+            if (state.count === lastPhaseIndex && state.timeLimitReached) {
                 state.sessionComplete = true;
                 state.isPlaying = false;
                 state.hasStarted = false;
@@ -445,33 +546,51 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function render() {
+        const exercise = exerciseTypes[state.exerciseType];
+        const phases = getCurrentPhases();
+
         let html = `
-            <h1>Box Breathing</h1>
+            <h1>${exercise.name}</h1>
         `;
+
         if (state.isPlaying) {
             html += `
                 <div class="timer">Total Time: ${formatTime(state.totalTime)}</div>
                 <div class="instruction">${getInstruction(state.count)}</div>
             `;
-            const phases = ['Inhale', 'Hold', 'Exhale', 'Wait'];
             html += `<div class="phase-tracker">`;
-            phases.forEach((label, index) => {
-                const phaseColor = phaseColors[index] || '#fde68a';
+            phases.forEach((phase, index) => {
+                const phaseColor = phase.color;
                 const softPhaseColor = hexToRgba(phaseColor, 0.25);
                 html += `
                     <div class="phase-item ${index === state.count ? 'active' : ''}" style="--phase-color: ${phaseColor}; --phase-soft: ${softPhaseColor};">
                         <span class="phase-dot"></span>
-                        <span class="phase-label">${label}</span>
+                        <span class="phase-label">${phase.name}</span>
                     </div>
                 `;
             });
             html += `</div>`;
         }
+
         if (state.timeLimitReached && !state.sessionComplete) {
-            const limitMessage = state.isPlaying ? 'Finishing current cycle…' : 'Time limit reached';
+            const limitMessage = state.isPlaying ? 'Finishing current cycle...' : 'Time limit reached';
             html += `<div class="limit-warning">${limitMessage}</div>`;
         }
+
         if (!state.isPlaying && !state.sessionComplete) {
+            // Exercise type selector
+            html += `<div class="exercise-selector">`;
+            Object.entries(exerciseTypes).forEach(([key, ex]) => {
+                html += `
+                    <button class="exercise-button ${state.exerciseType === key ? 'active' : ''}" data-exercise="${key}">
+                        ${ex.name}
+                    </button>
+                `;
+            });
+            html += `</div>`;
+
+            html += `<p class="exercise-description">${exercise.description}</p>`;
+
             html += `
                 <div class="settings">
                     <div class="form-group">
@@ -500,9 +619,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="prompt">Press start to begin</div>
             `;
         }
+
         if (state.sessionComplete) {
             html += `<div class="complete">Complete!</div>`;
         }
+
         if (!state.sessionComplete) {
             html += `
                 <button id="toggle-play">
@@ -511,14 +632,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 </button>
             `;
         }
-        if (!state.isPlaying && !state.sessionComplete) {
+
+        if (!state.isPlaying && !state.sessionComplete && exercise.hasPhaseTimeSlider) {
+            const range = exercise.phaseTimeRange;
+            const currentValue = state.exerciseType === 'longExhale' ? state.exhaleDuration : state.phaseTime;
             html += `
                 <div class="slider-container">
-                    <label for="phase-time-slider">Phase Time (seconds): <span id="phase-time-value">${state.phaseTime}</span></label>
-                    <input type="range" min="3" max="6" step="1" value="${state.phaseTime}" id="phase-time-slider">
+                    <label for="phase-time-slider">${exercise.phaseTimeLabel} (seconds): <span id="phase-time-value">${currentValue}</span></label>
+                    <input type="range" min="${range.min}" max="${range.max}" step="${range.step}" value="${currentValue}" id="phase-time-slider">
                 </div>
             `;
         }
+
         if (state.sessionComplete) {
             html += `
                 <button id="reset">
@@ -527,6 +652,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </button>
             `;
         }
+
         if (!state.isPlaying && !state.sessionComplete) {
             html += `
                 <div class="shortcut-buttons">
@@ -542,6 +668,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             `;
         }
+
         app.innerHTML = html;
 
         updateCanvasVisibility();
@@ -556,11 +683,28 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('sound-toggle').addEventListener('change', toggleSound);
             const timeLimitInput = document.getElementById('time-limit');
             timeLimitInput.addEventListener('input', handleTimeLimitChange);
-            const phaseTimeSlider = document.getElementById('phase-time-slider');
-            phaseTimeSlider.addEventListener('input', function() {
-                state.phaseTime = parseInt(this.value);
-                document.getElementById('phase-time-value').textContent = state.phaseTime;
+
+            // Exercise type buttons
+            document.querySelectorAll('.exercise-button').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    setExerciseType(btn.dataset.exercise);
+                });
             });
+
+            // Phase time slider
+            const phaseTimeSlider = document.getElementById('phase-time-slider');
+            if (phaseTimeSlider) {
+                phaseTimeSlider.addEventListener('input', function() {
+                    const value = parseFloat(this.value);
+                    if (state.exerciseType === 'longExhale') {
+                        state.exhaleDuration = value;
+                    } else {
+                        state.phaseTime = value;
+                    }
+                    document.getElementById('phase-time-value').textContent = value;
+                });
+            }
+
             document.getElementById('preset-2min').addEventListener('click', () => startWithPreset(2));
             document.getElementById('preset-5min').addEventListener('click', () => startWithPreset(5));
             document.getElementById('preset-10min').addEventListener('click', () => startWithPreset(10));
